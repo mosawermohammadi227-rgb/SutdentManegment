@@ -1,5 +1,39 @@
 <?php
 require_once 'database.php';
-if($_SERVER['REQUEST_METHOD']==='POST'){ $sid=(int)$_POST['student_id'];$date=$_POST['attendance_date'];$status=$_POST['status'];$s=$conn->prepare("INSERT INTO attendance(student_id,attendance_date,status) VALUES(?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status)");$s->bind_param("iss",$sid,$date,$status);$s->execute();header('Location:attendance.php');exit;}
-$students=$conn->query("SELECT id,student_id,first_name,last_name FROM students ORDER BY first_name");$records=$conn->query("SELECT a.*,s.student_id,s.first_name,s.last_name FROM attendance a JOIN students s ON s.id=a.student_id ORDER BY attendance_date DESC,a.id DESC");
-?><!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Attendance</title><link rel="stylesheet" href="style.css"></head><body><div class="container"><header><h1>Attendance</h1></header><nav><a href="index.php">Students</a><a href="add_student.php">Add Student</a><a class="active" href="attendance.php">Attendance</a><a href="results.php">Results</a></nav><form class="form-card" method="post"><div class="form-grid"><label>Student<select name="student_id" required><?php while($s=$students->fetch_assoc()):?><option value="<?=$s['id']?>"><?=htmlspecialchars($s['student_id'].' - '.$s['first_name'].' '.$s['last_name'])?></option><?php endwhile;?></select></label><label>Date<input type="date" name="attendance_date" value="<?=date('Y-m-d')?>" required></label><label>Status<select name="status"><option>Present</option><option>Absent</option></select></label></div><button class="button">Save Attendance</button></form><div class="table-wrap"><table><tr><th>Date</th><th>Student</th><th>Status</th></tr><?php while($r=$records->fetch_assoc()):?><tr><td><?=htmlspecialchars($r['attendance_date'])?></td><td><?=htmlspecialchars($r['student_id'].' - '.$r['first_name'].' '.$r['last_name'])?></td><td><?=htmlspecialchars($r['status'])?></td></tr><?php endwhile;?></table></div></div></body></html>
+
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $sid = (int)($_POST['student_id'] ?? 0);
+    $date = $_POST['attendance_date'] ?? '';
+    $status = $_POST['status'] ?? '';
+
+    if ($sid <= 0 || !$date || !in_array($status, ['Present','Absent'], true)) {
+        $error = 'Please enter valid attendance information.';
+    } else {
+        $s = $conn->prepare("INSERT INTO attendance(student_id,attendance_date,status) VALUES(?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status)");
+        $s->bind_param("iss", $sid, $date, $status);
+        $s->execute();
+        header('Location: attendance.php');
+        exit;
+    }
+}
+
+$students = $conn->query("SELECT id,student_id,first_name,last_name FROM students ORDER BY first_name,last_name");
+$records = $conn->query("SELECT a.*,s.student_id,s.first_name,s.last_name FROM attendance a JOIN students s ON s.id=a.student_id ORDER BY attendance_date DESC,a.id DESC");
+?>
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Attendance</title><link rel="stylesheet" href="style.css"></head>
+<body><div class="container">
+<header class="hero"><div><h1>Attendance</h1><p>Record and review daily student attendance.</p></div><a class="button secondary" href="index.php">Back to Students</a></header>
+<nav><a href="index.php">Students</a><a href="add_student.php">Add Student</a><a class="active" href="attendance.php">Attendance</a><a href="results.php">Results</a></nav>
+<?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+<form class="form-card" method="post"><div class="form-grid">
+<label>Student<select name="student_id" required><?php while($s=$students->fetch_assoc()): ?><option value="<?=$s['id']?>"><?=htmlspecialchars($s['student_id'].' - '.$s['first_name'].' '.$s['last_name'])?></option><?php endwhile; ?></select></label>
+<label>Date<input type="date" name="attendance_date" value="<?=date('Y-m-d')?>" required></label>
+<label>Status<select name="status"><option value="Present">Present</option><option value="Absent">Absent</option></select></label>
+</div><button class="button">Save Attendance</button></form>
+<div class="section-title"><h2>Attendance History</h2></div>
+<div class="table-wrap"><table><thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Action</th></tr></thead><tbody>
+<?php while($r=$records->fetch_assoc()): ?><tr><td><?=htmlspecialchars($r['attendance_date'])?></td><td><?=htmlspecialchars($r['student_id'].' - '.$r['first_name'].' '.$r['last_name'])?></td><td><span class="badge <?=strtolower($r['status'])?>"><?=htmlspecialchars($r['status'])?></span></td><td><a href="delete_attendance.php?id=<?=$r['id']?>" onclick="return confirm('Delete this attendance record?')">Delete</a></td></tr><?php endwhile; ?>
+<?php if($records->num_rows===0): ?><tr><td colspan="4" class="empty">No attendance records yet.</td></tr><?php endif; ?>
+</tbody></table></div></div></body></html>
